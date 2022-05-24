@@ -131,7 +131,7 @@ print(head(LFYUFO_spe_peaks))
 ## test significance of difference in median
 print(wilcox.test(LFYUFO_spe_peaks$CFC,LFYUFO_spe_peaks$CFCm))
 print(wilcox.test(LFYUFO_spe_peaks$CFCm,LFYUFO_spe_peaks$LFYmLFY))
-wilcox.test(LFYUFO_spe_peaks$CFC,LFYUFO_spe_peaks$LFY_LFYm)
+print(wilcox.test(LFYUFO_spe_peaks$CFC,LFYUFO_spe_peaks$LFYmLFY))
 
 
 ### figure for publication 
@@ -161,14 +161,6 @@ violin_ratios_pub<-ggplot(data=melted_top20_CFC,aes(x=as.factor(variable),
                             expression(paste(frac(paste(LFY[K249R],"+UFO"),LFY[K249R]))),
                             expression(paste(frac(LFY[K249R],"LFY")))))
 
-# violin_ratios_pub
-
-# "#e9f5f8", "#add8e6", "#75a9d7"
-# "#F4EEFF", "#DCD6F7", "#A6B1E1"
-# "#BBDEF0", "#6B2737", "#E08E45"
-# "#FFBF46","#4B3B47","#6A6262"
-# "#59C3C3", "#52489C", "#FFBF46"
-# "#F9A12EFF","#FC766AFF","#9B4A97FF"
 
 ggsave(file="violinplot_top20perc_CFC_pub.png",device="png",plot=violin_ratios_pub,units="px", width=1800, height=1500)
 ggsave(file="violinplot_top20perc_CFC_pub.svg",device="svg",plot=violin_ratios_pub,units="px", width=1800, height=1500)
