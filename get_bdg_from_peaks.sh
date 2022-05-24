@@ -1,13 +1,6 @@
 ## script to get RIP-normalized bdg files for IGB peak visualization
 source /home/312.6-Flo_Re/312.6.1-Commun/scripts/TFgenomicsAnalysis/compil_functions.sh
 
-main_dir=/home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY-UFO/results
-mapping_dir=$main_dir/Mapping
-dir_peakcalling=$main_dir/PeakCalling
-dir_comparisons=$main_dir/comparisons
-
-
-
 
 ### Produce RIP bedgraph files
 get_RIP_RIL_bdgs (){
