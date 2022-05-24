@@ -129,7 +129,6 @@ print(head(LFYUFO_spe_peaks))
 ## test significance of difference in median
 print(wilcox.test(LFYUFO_spe_peaks$CFC,LFYUFO_spe_peaks$CFCm))
 print(wilcox.test(LFYUFO_spe_peaks$CFCm,LFYUFO_spe_peaks$LFYmLFY))
-# wilcox.test(LFYUFO_spe_peaks$CFCm,LFYUFO_spe_peaks$LFY_LFYm)
 wilcox.test(LFYUFO_spe_peaks$CFC,LFYUFO_spe_peaks$LFY_LFYm)
 
 
