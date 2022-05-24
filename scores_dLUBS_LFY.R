@@ -40,7 +40,6 @@ melted<-melt(top20CFC, id=c("file","CFC"))
 
 
 ## select lowest 20% of CFC
-tenperc<-round(((dim(table)[1])*0.1),digits=0)
 low20CFC<-tail(table_CFC_ordered,n=twentyperc)
 low20CFC<-low20CFC[,c(4,7:10)]
 
