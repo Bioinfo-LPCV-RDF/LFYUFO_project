@@ -302,7 +302,7 @@ fi
 
 ###### ChIP vs ampDAP comparison
 ## bash microarray_ufo.sh # to analyse ufo microarray data
-## bash LFYChIP_CFC2_comparisons_clean.sh # to merge all ChIPs, compare to ampDAP LFYUFO and cross with results from microarray analysis
+## bash LFYChIP_CFC2_comparisons.sh # to merge all ChIPs, compare to ampDAP LFYUFO and cross with results from microarray analysis
 
 
 
