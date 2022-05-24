@@ -4,7 +4,6 @@ library(svglite)
 library(reshape2)
 
 
-just a change 
 
 args <- commandArgs(TRUE)
 wd_comp1=args[1]
