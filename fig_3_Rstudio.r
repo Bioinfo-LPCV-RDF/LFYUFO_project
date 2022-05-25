@@ -62,23 +62,21 @@ covplot<-ggplot(data=table,aes(x=LFYUFO_cf_RiP, y=LFYamp_RiP))+
   scale_size_manual(values=c(1.8,2.3),
                     guide="none")+
   scale_colour_gradientn(colours=LFYvsLFYUFO_gradient,
-                       name=expression(paste("CFC = ", frac("LFY+UFO","LFY"))),
+                       name=expression(paste("CFC = ", frac("LFY-UFO","LFY"))),
                        breaks=c(1,5,10,15,20))+
   theme_classic()+
   theme(axis.title = element_text(size=Fontsize+1),
         axis.text = element_text(size=Fontsize),
         legend.title = element_text(size=Fontsize),
         legend.text = element_text(size=Fontsize))+
-  xlab(expression(paste("LFY+UFO (",Log[10]," RPKM)")))+
+  xlab(expression(paste("LFY-UFO (",Log[10]," RPKM)")))+
   ylab(expression(paste("LFY (",Log[10]," RPKM)")))+
   scale_shape_manual(values=c(17,19),name="Peaks",
                      labels=c("training set","other"))+
-  geom_abline(intercept = -0.32, slope = 1,size=0.2)+
   geom_abline(intercept = 0,linetype="longdash",size=0.1)+
   coord_fixed()+
   guides(color = guide_colourbar(order=1),
          shape = guide_legend(order=2))
-
 
 
 
