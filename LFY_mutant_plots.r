@@ -41,9 +41,9 @@ p_LFYm_LFYmUFO<-ggplot(data=table,aes(x=LFYmUFO, y=LFYm))+
   scale_x_log10(limits=limitsplot)+
   geom_point(alpha=0.3,aes(color=CFCm))+
   geom_abline(intercept = 0,linetype="dashed",size=0.1) +
-  scale_colour_gradientn(colours=LFYmvsLFYmUFO_gradient,name=expression(paste("CFC = ",frac(paste(LFY[K249R],"+UFO"),LFY[K249R]))))+
+  scale_colour_gradientn(colours=LFYmvsLFYmUFO_gradient,name=expression(paste("CFC = ",frac(paste(LFY[K249R],"-UFO"),LFY[K249R]))))+
   theme(text = element_text(size = 7))+
-  xlab(expression(paste(LFY[K249R],"+UFO (",Log[10]," RPKM)")))+
+  xlab(expression(paste(LFY[K249R],"-UFO (",Log[10]," RPKM)")))+
   ylab(expression(paste(LFY[K249R]," (",Log[10]," RPKM)")))+
   theme_classic()+coord_fixed()+
   theme(axis.title=element_text(size=Fontsize+4),
@@ -123,7 +123,7 @@ twentyperc<-round(dim(CFC_sorted_table)[1]*0.2,digits=0)
 LFYUFO_spe_peaks<-head(CFC_sorted_table, n=twentyperc)
 
 
-LFYUFO_spe_peaks<-LFYUFO_spe_peaks[,c(14:20)] # only keep last six columns
+LFYUFO_spe_peaks<-LFYUFO_spe_peaks[,c(14:19)] # only keep last six columns
 print(head(LFYUFO_spe_peaks))
 
 
@@ -135,9 +135,10 @@ print(wilcox.test(LFYUFO_spe_peaks$CFC,LFYUFO_spe_peaks$LFYmLFY))
 
 
 ### figure for publication 
-melted_top20_CFC = melt(LFYUFO_spe_peaks, id.vars = c("CFCm","LFYmLFY"), 
-                        measure.vars = c("CFC", "CFCm","LFYmLFY"))
-
+melted_top20_CFC = melt(LFYUFO_spe_peaks, id.vars = c("CFCm"),#,"LFYmLFY"), 
+                        measure.vars = c("CFC", "CFCm"))#,"LFYmLFY"))
+print(head(melted_top20_CFC))
+print(table(melted_top20_CFC$variable))
 
 
 violin_ratios_pub<-ggplot(data=melted_top20_CFC,aes(x=as.factor(variable), 
@@ -153,17 +154,17 @@ violin_ratios_pub<-ggplot(data=melted_top20_CFC,aes(x=as.factor(variable),
         axis.text.x=element_text(size=Fontsize+2),
         axis.text.y=element_text(size=Fontsize+2),
         legend.position="none")+
-  scale_fill_manual(values=c("#fcf6f6", "#ebbab9", "#da7e7c"),
-                    name = "ratio", labels = c(expression(paste("CFC = ",frac("LFY+UFO","LFY"))),
-                                               expression(paste("CFC = ",frac(paste(LFY[K249R],"+UFO"),LFY[K249R]))),
-                                               expression(paste(LFY[K249R],"/LFY"))))+
-  scale_x_discrete(labels=c(expression(paste(frac("LFY+UFO","LFY"))),
-                            expression(paste(frac(paste(LFY[K249R],"+UFO"),LFY[K249R]))),
-                            expression(paste(frac(LFY[K249R],"LFY")))))
+  scale_fill_manual(values=c("#fcf6f6", "#ebbab9"),#, "#da7e7c"),
+                    name = "ratio", labels = c(expression(paste("CFC = ",frac("LFY-UFO","LFY"))),
+                                               expression(paste("CFC = ",frac(paste(LFY[K249R],"-UFO"),LFY[K249R])))))+#,
+#                                                expression(paste(LFY[K249R],"/LFY"))))+
+  scale_x_discrete(labels=c(expression(paste(frac("LFY-UFO","LFY"))),
+                            expression(paste(frac(paste(LFY[K249R],"-UFO"),LFY[K249R])))))#,
+#                             expression(paste(frac(LFY[K249R],"LFY")))))
 
 
-ggsave(file="violinplot_top20perc_CFC_pub.png",device="png",plot=violin_ratios_pub,units="px", width=1800, height=1500)
-ggsave(file="violinplot_top20perc_CFC_pub.svg",device="svg",plot=violin_ratios_pub,units="px", width=1800, height=1500)
+ggsave(file="violinplot_top20perc_CFC_pub.png",device="png",plot=violin_ratios_pub,units="px", width=1400, height=1500)
+ggsave(file="violinplot_top20perc_CFC_pub.svg",device="svg",plot=violin_ratios_pub,units="px", width=1400, height=1500)
 
 
 
