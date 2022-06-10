@@ -1,8 +1,8 @@
 source /home/312.6-Flo_Re/312.6.1-Commun/scripts/TFgenomicsAnalysis/compil_functions.sh
-source /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY-UFO/scripts/get_bdg_from_peaks.sh
+source /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY-UFO/scripts/LFYUFO_github_scripts/get_bdg_from_peaks.sh
 
 main_dir=/home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY-UFO/results
-
+echo 'hello'
 
 
 fastq_dir=$main_dir/Fastq
@@ -92,9 +92,9 @@ done
 
 
 
-### rep/rep plots
+## rep/rep plots
 bash rep_rep_plots.sh
-## plot them on Rstudio with plot_pretty_reprep.r
+# plot them on Rstudio with plot_pretty_reprep.r
 
 
 
@@ -187,15 +187,15 @@ fi
 ## LFY-spe motif:
 if [[ ! -f $out_motif/${name1}/${name1}.pfm ]]; then
 	echo -e "\nCompute motif for LFY-specific peaks\n"
-	tail -n 600 $tsvtable | awk -v OFS="\t" '{print $1,$2,$3}' > $dir_comparisons/${name1}_${name2}/${name1}_spePeaks_RIP.bed
-	bottom_600_peaks=$dir_comparisons/${name1}_${name2}/${name1}_spePeaks_RIP.bed ## use this peak file to compute motif 
+	maxmean_file=$dir_peakcalling/${name1}/${name1}_maxMean.bed
+	tail -n 600 $maxmean_file | awk -v OFS="\t" '{print $1,$2,$3}' > $dir_peakcalling/${name1}/${name1}_spePeaks.bed
+	bottom_600_peaks=$dir_peakcalling/${name1}/${name1}_spePeaks.bed ## use this peak file to compute motif 
 	head $bottom_600_peaks
 	echo "LFY preparation..."
 	
 	name=LFYamp
 	compute_motif -p $bottom_600_peaks -n $name -g $genome -od $out_motif -ls 600 -nm 1 -mim 19 -mam 19 -s 1234 -pal # compute motif for LFY+UFO-specific peaks
-	
-fi 
+fi
 
 
 
@@ -350,7 +350,7 @@ if [[ ! -f $out_scores/scores_dLUBS_th15.bdg ]]; then
 	matrixlen=$(wc -l $dLUBS | awk '{print $1-2}')
 	
 	echo 'calculating dLUBS genome-wide scores'
-# 	python $scores_prog -m $dLUBS -f $genome -o $out_scores -th -${th}
+	python $scores_prog -m $dLUBS -f $genome -o $out_scores -th -${th}
 	echo 'scores done!'
 	
 	## create bdg for IGB
@@ -370,7 +370,7 @@ echo "use LFYUFO/LFY peaks for LFYm and LFYmUFO"
 awk -v OFS="\t" '{print $1,$2,$3}' $tsvtable | sort -k1,1 -k2,3n > $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/LFYamp_LFYUFO_cf_peaks.bed
 
 
-retrieve RIP normalization
+## retrieve RIP normalization
 mode="inPeaks"
 sample_names=(	"LFYamp1" "LFYamp2" "LFYamp3"
 				"LFYUFO_cfa" "LFYUFO_cfb" "LFYUFO_cfc"
@@ -380,7 +380,6 @@ peaks=$dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/LFYamp_LFYUFO_cf_peaks.bed
 
 compute_rpkmrip_rpkmril -p $peaks -bd $main_dir/Mapping -pd $main_dir/PeakCalling -sn sample_names[@] -m $mode -o $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO
 
- $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/peaks_perSample_rpkminPeaks.txt
 
 ## get bdgs for mutant LFY experiments
 if [[ ! -d $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/inPeaks/LFYmUFO ]]; then 
@@ -405,7 +404,7 @@ if [[ ! -d $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/inPeaks/LFYmUFO ]]; then
 fi
 
 
-echo 'hello! 23/05'
+
 if [[ ! -f $dir_peakcalling/LFYmUFO_cf/LFYK249RUFO_narrow.bed ]]; then
 	submitted_data=$main_dir/GEO_submitted_data
 	cp $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/inPeaks/LFYmUFO/LFYmUFO_RIP_cov.bdg $submitted_data/LFYK249RUFO_RIP_cov.bdg
@@ -428,7 +427,7 @@ fi
 
 ### retrieve RIL normalization for the same set
 # echo 'retrieve RIL'
-# compute_rpkmrip_rpkmril -p $peaks -bd $main_dir/Mapping -pd $main_dir/PeakCalling -sn sample_names[@] -m "inLibs" -o $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/RIL
+compute_rpkmrip_rpkmril -p $peaks -bd $main_dir/Mapping -pd $main_dir/PeakCalling -sn sample_names[@] -m "inLibs" -o $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/RIL
 
 
 ##### calculate dLUBS and LFY scores on AP3 promoter
