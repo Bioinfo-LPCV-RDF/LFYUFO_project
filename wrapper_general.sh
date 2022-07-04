@@ -332,6 +332,29 @@ fi
 
 
 
+### get RIP-normalized peaks from LFY and LFY-UFO as well:
+mode="inPeaks"
+sample_names=(	"LFYamp1" "LFYamp2" "LFYamp3"
+				"LFYUFO_cfa" "LFYUFO_cfb" "LFYUFO_cfc"
+				"LFYm_a" "LFYm_b"
+				"LFYmUFO_cfa" "LFYmUFO_cfb")
+
+
+echo "creating peak file"
+awk -v OFS="\t" '{print $1,$2,$3}' $dir_comparisons/LFYm_LFYmUFO_cf/table_LFYm_LFYmUFO_cf_RiL_RiP.tsv > $dir_comparisons/LFYm_LFYmUFO_cf/table_LFYm_LFYmUFO_cf_peaks.bed
+peaks=$dir_comparisons/LFYm_LFYmUFO_cf/table_LFYm_LFYmUFO_cf_peaks.bed
+mode="inPeaks"
+
+mapping_dir=("$main_dir/Mapping")
+peaks_dir=("$main_dir/PeakCalling")
+
+echo "computing rpkmrip"
+compute_rpkmrip_rpkmril -p $peaks -bd mapping_dir -pd peaks_dir -sn sample_names[@] -m $mode -o $dir_comparisons/LFYm_LFYmUFO_cf
+
+
+
+
+
 
 
 ##### calculate dLUBS scores genome-wide
@@ -379,6 +402,11 @@ sample_names=(	"LFYamp1" "LFYamp2" "LFYamp3"
 peaks=$dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO/LFYamp_LFYUFO_cf_peaks.bed
 
 compute_rpkmrip_rpkmril -p $peaks -bd $main_dir/Mapping -pd $main_dir/PeakCalling -sn sample_names[@] -m $mode -o $dir_comparisons/LFYamp_LFYUFO_LFYm_LFYmUFO
+
+
+
+
+
 
 
 ## get bdgs for mutant LFY experiments
