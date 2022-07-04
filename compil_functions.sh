@@ -283,12 +283,12 @@ do
 # 				local out=$out_dir/$(basename $filename)_${fileIN[2]%.*} #$(dirname $fastq)/$(basename $filename)_${fileIN[2]%.*}
 				if $fastqIsFirst
 				then 
-  					NGmerge -a -1 $fastq -2 $paired_file -q 35 -o $R_NGmerge -n $proc
+  					NGmerge -a -1 $fastq -2 $paired_file -q 34 -o $R_NGmerge -n $proc
  					$PATH_TO_BOWTIE2/bowtie2 --seed $seed -x $PATH_TO_BOWTIE_INDEX -1 ${out}_1.fastq.gz -2 ${out}_2.fastq.gz -S $out.sam --dovetail -p $proc 2> ${out}_log.txt
 					#echo "$PATH_TO_BOWTIE2/bowtie2 -x $PATH_TO_BOWTIE_INDEX -1 $fastq -2 $paired_file -S $fastq.sam"
 					echo "Processed file ${out}.sam"
 				else
-  					NGmerge -a -2 $fastq -1 $paired_file -q 35 -o $R_NGmerge -n $proc
+  					NGmerge -a -2 $fastq -1 $paired_file -q 34 -o $R_NGmerge -n $proc
   					$PATH_TO_BOWTIE2/bowtie2 --seed $seed -x $PATH_TO_BOWTIE_INDEX -1 ${out}_1.fastq.gz -2 ${out}_2.fastq.gz -S $out.sam --dovetail -p $proc 2> ${out}_log.txt
 					echo "$PATH_TO_BOWTIE2/bowtie2 -x $PATH_TO_BOWTIE_INDEX -1 $paired_file -2 $fastq -S $fastq.sam"
 					echo "Processed file ${out}.sam" 
@@ -303,6 +303,7 @@ do
 		fi
 		echo "Step 2: filtering SAM";
 		# filter out reads with suboptimal scores
+		# filter out reads with more than 2 mismatches, mapping qual <30 and with subalignement (romain 23june2022' interpretation of command below)
 		$PATH_TO_SAMTOOLS/samtools view -Sh $out.sam | \
 		grep -e "^@" -e 'XM:i:[012][^0-9]' | awk '$1~/@/ || $5>30 {print $0}' | grep -v "XS:i:" > $out.filtered.sam
 # 		$PATH_TO_SAMTOOLS/samtools view -Sh $out.sam | \
@@ -511,10 +512,11 @@ local out_dir=${out_dir}/${in_dir##*/}
 #check if the output folder is not already there 
 if [ ! -d "$out_dir" ]
      then
+		echo "creating folder for sample" ## LT
         #create folder structure
-        mkdir -p $out_dir
-        mkdir $out_dir/controls
-        mkdir $out_dir/replicates     
+        mkdir -m 774 -p $out_dir
+        mkdir -m 774 $out_dir/controls
+        mkdir -m 774 $out_dir/replicates     
     
         #split controls and replicates separately (ENCODE datasets have control in the name of the file)     
         for bam in $(find $in_dir -name "*.filtered.sorted.nodup.bam")
@@ -542,8 +544,8 @@ if [ ! -d "$out_dir" ]
         local all_ok=true;
         cd $out_dir/controls
         local controls=(*)
-        echo ${controls[@]} ## LT 07/01
-        
+        echo "controls: ${controls[@]}" ## LT 07/01
+
         if [ ${#controls[@]} -eq 0 ]
             then
                echo "No control files present"
@@ -568,6 +570,7 @@ if [ ! -d "$out_dir" ]
         #check for replicates and unzip them or log "no replicates" 
         cd $out_dir/replicates
         local replicates=(*)
+
         if [ ${#replicates[@]} -eq 0 ]
             then
                echo "No replicates present"
@@ -583,7 +586,7 @@ if [ ! -d "$out_dir" ]
                local replicates=`join_by " " "${replicates[@]}"`
                echo ${replicates[@]}
                #merge all replicates files
-               $PATH_TO_SAMTOOLS/samtools merge replicate.bam $replicates
+               $PATH_TO_SAMTOOLS/samtools merge replicate.bam $replicates #this step is not needed anymore because we run macs2 we treate sample by sample and then merge with mspc
                #convert to BED
                $PATH_TO_BEDTOOLS2/bamToBed -i replicate.bam > replicate.bed
                #clean up
@@ -608,7 +611,7 @@ if [ ! -d "$out_dir" ]
 			local formatBed="BEDPE"
 		fi
 		
-		
+		echo "number of controls: ${#controls[@]}" ## LT
 		echo "Started MACS..."
 		time $PATH_TO_MACS/macs2 callpeak -t $out_dir/replicates/replicate.bed -c $out_dir/controls/control.bed -B -f $formatBed -n ${in_dir##*/} -g $Genome_length --call-summits $additionnal_args >> $log 2>&1;
        elif [ ${#controls[@]} -eq 0 ]; then
@@ -695,7 +698,7 @@ fi
 
 main_peakcalling (){
 # main_peakcalling -id -cd -od -nc -g -add
-local top=0
+local top=0; local mspcpc=100
 while [ $# -ge 1 ] && [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
 	case $1 in
 		-id)
@@ -722,6 +725,9 @@ while [ $# -ge 1 ] && [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
 		-ps)
 			local phs=$(calc $2/2.0) # $2 is the peak size! but we take only half, hence peak half size...
 			echo "peak size: ${2}";shift 2;;
+		-mspc)
+			local mspcpc=$2
+			echo "percentage for mspc set to: $2"; shift 2;;
 		-s)
 			local seedrandom=$2
 			echo "random seed set to: ${2}"; shift 2;;
@@ -793,12 +799,12 @@ done
 
 done
 if [[ -d $out_dir/$name_cons ]]; then rm -Rf $out_dir/$name_cons; fi
-mkdir -p $out_dir/$name_cons/temp
+mkdir -p -m 774 $out_dir/$name_cons/temp
 if [ "${#in_dir[@]}" -gt 1 ]; then
 
 	if [[ $(uname -a) =~ "el7" ]]; then
 		echo "${mspc_mk} -i ${list_peaks_mspc[@]} -r Tec -w 1e-4 -s 1e-8 -c 100% -o $out_dir/$name_cons -d 1"
-		${mspc_mk} -i ${list_peaks_mspc[@]} -r Tec -w 1e-4 -s 1e-8 -c 100% -o $out_dir/$name_cons -d 1
+		${mspc_mk} -i ${list_peaks_mspc[@]} -r Tec -w 1e-4 -s 1e-8 -c ${mspcpc}% -o $out_dir/$name_cons -d 1
 	else
 		echo "Error SL7 node is needed for mspc" && return 1
 	fi
@@ -832,7 +838,9 @@ if [ "${#in_dir[@]}" -gt 1 ]; then
 
 	paste ${files[@]} > $out_dir/$name_cons/temp/${name_cons}_narrow.bed
 	echo "nb of replicates :${#files[@]}"
-	awk -v SIZE=$phs -v th=${#files[@]} -v FS="[ \t]" -v OFS="\t" 'function abs(v) {return v < 0 ? -v : v} {nbmax=0; 
+	thpc=$(calc ${#files[@]}*${mspcpc}/100 )
+	echo $thpc
+	awk -v SIZE=$phs -v th=${thpc} -v FS="[ \t]" -v OFS="\t" 'function abs(v) {return v < 0 ? -v : v} {nbmax=0; 
 	for(i=4;i<=NF;i++) { 
 		if($i!= -1){ 
 			if(nbmax!=0){
@@ -1176,6 +1184,83 @@ fi
 }
 
 
+analyze_decile(){
+	local typeofnorm="RiP"
+	while [ $# -ge 1 ] && [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
+	case $1 in
+		-n1)
+			local name1=$2
+			echo "name of directory for dataset 1 is: ${2}";shift 2;;
+		-n1)
+			local name2=$2
+			echo "name of directory for dataset 1 is: ${2}";shift 2;;
+		-o)
+			local out_dir=$2
+			echo "ouput directory set to: ${2}"; shift 2;;
+		-t)
+			local typeofnorm=$2
+			echo "type of normalization to use set to: ${2}"; shift 2;;
+		-f)
+			local table_comp=$2
+			echo "comparison table set to: ${2}"; shift 2;;
+		-h)
+			usage initial_comparison; return;;
+		--help)
+			usage initial_comparison; return;;
+		*)
+			echo "Error in arguments"
+			echo $1; usage initial_comparison; return;;
+	esac
+done
+local Errors=0
+if [ -z $name1 ]; then echo "ERROR: -n1 argument needed"; Errors+=1; fi
+if [ -z $name2 ]; then echo "ERROR: -n2 argument needed"; Errors+=1; fi
+if [ -z $out_dir ]; then echo "ERROR: -o argument needed"; Errors+=1; fi
+if [ -z $table_comp ]; then echo "ERROR: -f argument needed"; Errors+=1; fi
+
+if [ $Errors -gt 0 ]; then usage initial_comparison; return 1; fi
+
+
+
+
+	local $name1=$1
+	local $name2=$2
+	
+	local dir_comp=$3
+	local typeofnorm=$4 # either RIP or RIL
+	
+	
+	
+	mkdir -p -m 774 ${dir_comp}/${name1}_${name2}/
+	
+	local total=$(wc -l ${dir_comp}/${name1}_${name2}/table_${name1}_${name2}_RiL_RiP.tsv | awk '{print $1-1}')
+	local decile=$(calc $total/10 | awk '{print int($1+0.5)}')
+# 	local decile=$(calc $total/10)
+	echo "$total $decile"
+	if [[ $typeofnorm == *"RiP"* ]] || [[ $typeofnorm == *"RIP"* ]] || [[ $typeofnorm == *"rip"* ]]; then
+		awk 'NR!=1{print $1,$2,$3,$7,$8,$7/$8}' ${dir_comp}/${name1}_${name2}/table_${name1}_${name2}_RiL_RiP.tsv | sort -k6,6n | awk -v decile=$decile -v OFS="\t" '{printf "%s\t%d\t%d\t%f\t%f\t%f\t%d\n", $1,$2,$3,$4,$5,$6,((NR-1)/decile)+1}' | awk -v OFS="\t" '$7==11{print $1,$2,$3,$4,$5,$6,10; next}{print $0}' > ${dir_comp}/${name1}_${name2}/tmp_table_${name1}_${name2}.tsv
+	else
+		awk 'NR!=1{print $1,$2,$3,$9,$10,$9/$10}' ${dir_comp}/${name1}_${name2}/table_${name1}_${name2}_RiL_RiP.tsv | sort -k6,6n | awk -v decile=$decile -v OFS="\t" '{printf "%s\t%d\t%d\t%f\t%f\t%f\t%d\n", $1,$2,$3,$4,$5,$6,((NR-1)/decile)+1}' | awk -v OFS="\t" '$7==11{print $1,$2,$3,$4,$5,$6,10; next}{print $0}' > ${dir_comp}/${name1}_${name2}/tmp_table_${name1}_${name2}.tsv
+	fi
+# 	echo -e "Spacing\tDecile\tER\tIR\tDR" > ${dir_comp}/${name1}_${name2}/${name1}vs${name2}/Recap_F2.tsv
+	echo -e "Spacing\tDecile\tIR\tER\tDR" > ${dir_comp}/${name1}_${name2}/${name1}vs${name2}/Recap_F2.tsv # just for old nomenclature ARFs
+	for ((l=1;l<=10;l++)); do
+			awk -v OFS="\t" -v th=$l '$7==th{print $0}' ${dir_comp}/${name1}_${name2}/tmp_table_${name1}_${name2}.tsv > ${dir_comp}/${name1}_${name2}/tmp_peaks.tsv
+# 			compute_motif -p ${dir_comp}/${name1}_${name2}/tmp_peaks.tsv -n decile${l} -g $genome -od ${dir_comp}/${name1}_${name2}/${name1}vs${name2}/Motif -ls 600 -s 257486 -nm 5 -mim 8 -mam 10
+			
+			list_peaks=("${dir_comp}/${name1}_${name2}/tmp_peaks.tsv")
+			list_matrices=("$ARF5_PWM")
+			th=("-8" "-9" "-10")
+			list_name=("decile${l}")
+# 			compute_space -p list_peaks[@] -m list_matrices[@] -n list_name[@] -od ${dir_comp}/${name1}_${name2}/${name1}vs${name2}/Spacing -maxs $max_spacing -mins $min_spacing -ol ${offset_left} -or ${offset_right} -g ${genome} -th th[@]
+			awk -v OFS="\t" -v decile=$l 'NR!=1{print $1,decile,$3,$7,$11}' ${dir_comp}/${name1}_${name2}/${name1}vs${name2}/Spacing/decile${l}/Zscore_stats_F2.tsv >> ${dir_comp}/${name1}_${name2}/${name1}vs${name2}/Recap_F2.tsv
+			
+			
+	done
+	$R_36 /home/312.6-Flo_Re/312.6.1-Commun/ARF-anr/DAP_052022/Heatmap.R ${dir_comp}/${name1}_${name2}/${name1}vs${name2}/Recap_F2.tsv ${dir_comp}/${name1}_${name2}/${name1}vs${name2} $name1 $name2 ${dir_comp}/${name1}_${name2}/tmp_table_${name1}_${name2}.tsv
+}
+
+
 comparison(){
 # comparison -n -od -id -f -he
 while  [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
@@ -1344,7 +1429,10 @@ do
 	
 	
 	for bams in ${bam_dir[@]}; do
-		local bam_file=$(find ${bams} -name "$SAMP.filtered.sorted.nodup.bam" -type f )
+# 		local bam_file=$(find ${bams} -name "$SAMP.filtered.sorted.nodup.bam" -type f )
+		local bam_file=$(find ${bams}/$SAMP -name "*.filtered.sorted.nodup.bam" -type f | grep -v control | grep -v fakename) ## LT
+		echo $bam_file ## LT
+# 		exit 0
 		if [ $bam_file != "" ]; then break; fi
 	done
 	 #this is to remove the control bam # NOTE NEW by JL 02/12/2021
@@ -1366,6 +1454,7 @@ do
 # 	local tmp241=$bam_dir/$SAMP/*.filtered.sorted.nodup.bam
 # 	echo ${tmp241}
 # 	local bam_file=$(echo $tmp241 | sed -e 's/ .*$//g') #this is to remove the control bam
+	echo "hello"
 	echo ${bam_file}
 	if [ "$getCov" == "yes" ]
 	then
@@ -1648,11 +1737,11 @@ fi
 	
 	
 	bedtools getfasta -fi $genome -fo $results_motif/$name/sets/${name}.fas -bed $results_motif/$name/sets/${name}.bed
-	
+# 	/home/312.6-Flo_Re/312.6.1-Commun/data/meme_db/motif_databases/JASPAR/JASPAR2018_CORE_plants_non-redundant.meme
 	if $pal ; then
-		$meme_prog -oc $results_motif/$name/meme -nmeme $learning_size -meme-pal -meme-maxsize $(calc $learning_size*1000) -meme-minw $min_motif -meme-maxw $max_motif -meme-nmotifs $nb_motifs -dreme-m 0 -noecho $results_motif/$name/sets/${name}.fas -seed $seed -db /home/312.6-Flo_Re/312.6.1-Commun/data/meme_db/motif_databases/JASPAR/JASPAR2018_CORE_plants_non-redundant.meme
+		$meme_prog -oc $results_motif/$name/meme -nmeme $learning_size -meme-pal -meme-maxsize $(calc $learning_size*1000) -meme-minw $min_motif -meme-maxw $max_motif -meme-nmotifs $nb_motifs -dreme-m 0 -noecho $results_motif/$name/sets/${name}.fas -seed $seed -db /home/312.6-Flo_Re/312.6.1-Commun/data/meme_db/motif_databases/JASPAR2022_CORE_nonredundant_pfm.meme
 	else
-		$meme_prog -oc $results_motif/$name/meme -nmeme $learning_size -meme-maxsize $(calc $learning_size*1000) -meme-minw $min_motif -meme-maxw $max_motif -meme-nmotifs $nb_motifs -dreme-m 0 -noecho $results_motif/$name/sets/${name}.fas -seed $seed -db /home/312.6-Flo_Re/312.6.1-Commun/data/meme_db/motif_databases/JASPAR/JASPAR2018_CORE_plants_non-redundant.meme
+		$meme_prog -oc $results_motif/$name/meme -nmeme $learning_size -meme-maxsize $(calc $learning_size*1000) -meme-minw $min_motif -meme-maxw $max_motif -meme-nmotifs $nb_motifs -dreme-m 0 -noecho $results_motif/$name/sets/${name}.fas -seed $seed -db /home/312.6-Flo_Re/312.6.1-Commun/data/meme_db/motif_databases/JASPAR2022_CORE_nonredundant_pfm.meme
 	fi
 	$meme2meme $results_motif/$name/meme/meme_out/meme.txt > $results_motif/$name/meme/meme_out/meme_mini.txt
 	
@@ -1662,7 +1751,7 @@ fi
 
 	if $pal ; then
 		printf "\n\ngenerate TFFM learning set\n\n"
-		python $prepMEMEforPalTFFM -m $results_motif/$name/meme/meme_out/meme.txt -f $results_motif/$name/sets/${name}_tffm_learningset.fas # THIS SCRIPT NEEDS TO BE CORRECTED 
+		python $prepMEMEforPalTFFM -m $results_motif/$name/meme/meme_out/meme.txt -f $results_motif/$name/sets/${name}_tffm_learningset.fas -p ${selection_tffm} # THIS SCRIPT NEEDS TO BE CORRECTED 
 		local learning_set_tffm=$results_motif/$name/sets/${name}_tffm_learningset.fas
 # 		local learning_set_tffm=$results_motif/$name/sets/${name}.fas
 # 		cat $learning_set_tffm | grep ">" -v | tr "A" "@" | tr 'T' '@' | tr 'C' '@' | tr 'G' '@'  | sed 's/@//g' | tr '\n' 'U'
@@ -2249,9 +2338,10 @@ mkdir -p $tmpKMAC
 local tmpPWD=$(pwd)
 
 sed -i "s~$tmpPWD~$tmpKMAC~g" ${RUN}_outputs/${RUN}.ksm_list.txt
+head ${RUN}_outputs/${RUN}.ksm_list.txt
 if [ -d "$tmpKMAC/${RUN}_outputs" ]; then
   rm -Rf $tmpKMAC/${RUN}_outputs
-fi 
+fi
 mv ${RUN}_outputs $tmpKMAC/.
 printf "\nKMAC has finished\n\n"
 }
@@ -2691,6 +2781,8 @@ if [ -z $results ]; then echo "ERROR: -od argument needed"; Errors+=1; fi
 if [ ${thresholds[0]} -eq 0 ] && [ ${thresholds_dir} == "null" ]; then echo "ERROR either -th or -thd arguments needed; -th arguments needs to be a list"; Errors+=1; fi
 if [ ${thresholds_dir} != "null" ] && [ ! -d ${thresholds_dir} ]; then echo "ERROR directory for thresholds acquisition does not exist, please check your argument -thd"; Errors+=1; fi
 
+if [ ${matrix_type} == "SYMMETRIC" ]; then echo "palindromic mode enabled"; fi
+
 if [[ ${#peaks[@]} -ne ${#matrices[@]} ]] || [[ ${#peaks[@]} -ne ${#names[@]} ]]; then
 	echo "ERROR: LISTs for -p, -n and -m arguments should have the same length"; Errors+=1
 fi
@@ -2737,7 +2829,7 @@ do
 			local length_mat=$(awk -v OFS="[\t ]" '{if(NR==1){if($5=="SIMPLE"){typM="simple"} else {typM="dependency"};count=-1;next};if(typM=="simple"){count++};if(typM=="dependency"){if($1=="DEPENDENCY"){count-=2;exit};count++}}END{print count}' $matrice)
 			
 			if [ ! -f ${results}/${name}/scores/$(basename $peak).scores ];then
-				python $scores_prog -m ${matrice} -f $peak -o ${results}/${name}/scores/
+				python ${scores_prog} -m ${matrice} -f $peak -o ${results}/${name}/scores/
 			fi
 			
 			if [ ${thresholds[0]} -eq 0 ]; then
@@ -2866,197 +2958,6 @@ cat $spaceOut/out_spacing_pos12.tsv $spaceOut/out_spacing_pos21_converted.tsv |s
 
 }
 
-heatmap_reads(){
-local centered="False"
-# heatmap_reads
-while  [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
-	case $1 in
-		-b)
-			local bedgraphs=("${!2}")
-			echo "bedgraphs files set to: ${bedgraphs[@]}";shift 2;;
-        -n)
-			local names=("${!2}")
-			echo "names set to: ${names[@]}";shift 2;;
-		-od)
-			local out_dir=$2
-			echo "output directory set to: ${2}";shift 2;;
-		-or)
-			local order=$2
-			echo "order set to: ${2}";shift 2;;
-		-s)
-			local size_file=$2
-			echo "file of chromosome sizes set to: ${2}";shift 2;;
-		-p)
-			local peaks=$2
-			echo "peaks set to: ${2}";shift 2;;
-		-ws)
-			local window_size=`calc $2/2`
-			echo "window size around center of peaks set to: ${2}";shift 2;;
-		-ow)
-			local order_window=$2
-			echo "window for ordering: $2"; shift 2;;
-		-c)
-			local centered="True";
-			echo "plots will be centered"; shift 1;;
-		-h)
-			usage heatmap_reads; return;;
-		--help)
-			usage heatmap_reads; return;;
-		*)
-			echo "Error in arguments"
-			echo $1; usage heatmap_reads; return;;
-	esac
-done
-
-local Errors=0
-if [ -z $bedgraphs ]; then echo "ERROR: -b argument needed or need to be a LIST";Errors+=1;fi
-if [ -z $names ]; then echo "ERROR: -n argument needed or need to be a LIST";Errors+=1;fi
-if [ -z $out_dir ]; then echo "ERROR: -od argument needed";Errors+=1;fi
-if [ -z $size_file ]; then echo "ERROR: -s argument needed";Errors+=1;fi
-if [ -z $peaks ]; then echo "ERROR: -p argument needed";Errors+=1;fi
-
-if [ ${#names[@]} -ne ${#bedgraphs[@]} ]; then
-	echo "ERROR: -n & -b have to be lists of same length"; Errors+=1
-fi
-
-if [ -z $window_size ]; then echo "-ws argument not used, using 1000bp";local window_size=500 ;fi
-if [ -z $order ]; then echo "-or argument not used, ordering by CFR";local order=3 ;fi
-if [ -z $order_window ]; then echo "-ow argument not used, ordering on full sequences";local order_window="0:$window_size" ;fi
-if [[ $order_window != *":"* ]]; then
-	echo ""
-	Errors+=1
-fi
-
-if [ $Errors -gt 0 ]; then usage heatmap_reads; return 1; fi
-
-mkdir -p $out_dir
-
-if [ $window_size -gt 0 ]; then 
-awk -v len=$window_size -v OFS="\t" '{print $1, int($2+($3-$2)/2-len), int($2+($3-$2)/2+len),$4}' ${peaks} > $out_dir/${names[0]}_${names[1]}_peaks.bed
-else
-cp ${peaks} $out_dir/${names[0]}_${names[1]}_peaks.bed
-fi
-for ((i=0;i<${#bedgraphs[@]};i++))
-do
-	if [ ! -f $out_dir/${names[i]}.bw ]; then
-		$bdg_to_bw ${bedgraphs[i]} $size_file $out_dir/${names[i]}.bw
-	fi
-done
-processed=$out_dir/${names[0]}_${names[1]}_peaks.bed
-local names=`join_by " " "${names[@]}"`
-
-python $heatmap_mk -b $out_dir -p $processed -r $out_dir -s $order -n $names -w $window_size -c $centered --orderwindow $order_window
-
-
-}
-
-
-spacing_impact(){
-
-while  [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
-	case $1 in
-		-n)
-			local names=("${!2}")
-			echo "names set to: ${names[@]}";shift 2;;
-		-cp)
-			local comp_dir=${2}
-			echo "initial comparison directory set to: ${2}";shift 2;;
-		-od)
-			local out_dir=${2}
-			echo "output directory set to: ${2}";shift 2;;
-		-g)
-			local genome=${2}
-			echo "Genome fasta set to: ${2}";shift 2;;
-		-m)
-			local tffm=${2}
-			echo "matrix set to: ${2}";shift 2;;
-        -maxs)
-			local maxSpace=$2
-			echo "maximum spacing to compute set to: ${2}";shift 2;;
-        -mins)
-			local minSpace=$2
-			echo "minimum spacing to compute set to: ${2}";shift 2;;
-        -ol)
-			local offset_left=$2
-			echo "offset on the left set to: ${2}";shift 2;;
-        -or)
-			local offset_right=$2
-			echo "offset on the right set to: ${2}";shift 2;;
-		-sth)
-			local starting_th=$2
-			echo "starting threshold set to: ${2}";shift 2;;
-		-eth)
-			local ending_th=$2
-			echo "ending threshold set to: ${2}";shift 2;;
-		-ith)
-			local increment_th=$2
-			echo "threshold increments set to: ${2}";shift 2;;
-		-sp)
-			local spacing=("${!2}")
-			echo "spacings set to: ${spacing[@]}";shift 2;;
-		-c)
-			local colors=("${!2}")
-			echo "colors set to: ${colors[@]}";shift 2;;
-		-h)
-			usage spacing_impact; return;;
-		--help)
-			usage spacing_impact; return;;
-		*)
-			echo "Error in arguments"
-			echo $1; usage spacing_impact; return;;
-	esac
-done
-
-local Errors=0
-if [ -z $names ]; then echo "ERROR: -n argument needed or need to be a LIST";Errors+=1;fi
-if [ -z $comp_dir ]; then echo "ERROR: -cp argument needed";Errors+=1;fi
-if [ -z $out_dir ]; then echo "ERROR: -od argument needed";Errors+=1;fi
-if [ -z $genome ]; then echo "ERROR: -g argument needed";Errors+=1;fi
-if [ -z $tffm ]; then echo "ERROR: -m argument needed";Errors+=1;fi
-if [ -z $spacing ]; then echo "ERROR: -sp argument needed or need to be a LIST";Errors+=1;fi
-
-if [ -z $maxSpace ]; then echo "-maxs argument not used, computing up to 50bp spacing";local maxSpace=50 ;fi
-if [ -z $minSpace ]; then echo "-mins argument not used, starting with spacing 0";local minSpace=0 ;fi
-if [ -z $offset_left ]; then echo "-maxs argument not used, no left offset used";local offset_left=0 ;fi
-if [ -z $offset_right ]; then echo "-maxs argument not used, no right offset used";local offset_right=0 ;fi
-if [ -z $colors ]; then echo "-c argument not used, using default palette or need to be a LIST"; local colors=('#40A5C7' '#307C95' '#205364');fi
-# TODO check for error in th
-if [ $Errors -gt 0 ]; then usage spacing_impact; return 1; fi
-
-mkdir -p $out_dir
-sed "1d" ${comp_dir}/${names[0]}_${names[1]}/table_${names[0]}_${names[1]}.csv > $out_dir/table_${names[0]}_${names[1]}.bed
-local table=$out_dir/table_${names[0]}_${names[1]}.bed
-
-awk -v OFS="\t" '{print $1,$2,$3}' $table > $out_dir/${names[0]}_${names[1]}.bed
-local peaks=$out_dir/${names[0]}_${names[1]}.bed
-
-bedtools getfasta -fi $genome -fo $out_dir/${names[0]}_${names[1]}.fa -bed $peaks
-local peak_file_fas=$out_dir/${names[0]}_${names[1]}.fa
-
-# python $spacing_mk -tffm $tffm  -o $out_dir/ -n ${names[0]}_${names[1]}_spacing -minInter $minSpace -maxInter $maxSpace  -pos $peak_file_fas  -th 0.01 -neg $peak_file_fas -points True -ol $offset_left -or $offset_right -one_panel  -write_inter -no_absolute_panel
-local spacing=`join_by "," "${spacing[@]}"`
-echo $spacing
-local files=()
-local th1=$starting_th
-local continu1=1
-while [ $continu1 -eq 1 ];
-do
-	echo -e "th\t$th1"
-	sed 's/[:,/]/\t/g' $out_dir/${names[0]}_${names[1]}_spacing.bed | awk -v spacing=$spacing -v th1=$th1 -v th2=$th1 -v OFS="\t" '{save=0; split(spacing,list_spacing,","); for(i=4;i<=NF;i+=3){j=i+1;k=i+2;if(($j>=th1 && $k>=th2)||($j>=th2 && $k>=th1)){gsub(/^ER|^IR|^DR/,"",$i);for(h in list_spacing){if($i == list_spacing[h]){save=1}}}};print $1,$2,$3,save}' | awk -v FS="\t" '{print $4}' > $out_dir/Spacing${th1}.inter
-
-	paste $table $out_dir/Spacing${th1}.inter | sed "1ichr\tbegin\tend\t${names[0]}\t${names[1]}\tSpacing" >  $out_dir/table_${th1}.csv
-	files+=("$out_dir/table_${th1}.csv")
-	local th1=$(calc $th1+$increment_th)
-	local continu1=$(awk -vn1="$th1" -vn2=$ending_th 'BEGIN{print (n1<=n2)?1:0}')
-	
-done
-
-local files=`join_by "," "${files[@]}"`
-local colors=`join_by "," "${colors[@]}"`
-Rscript $impactspacing_mk -f $files -n "${names[0]},${names[1]}" -d $out_dir -c $colors
-}
-
-
 add_coverage(){
 
 while [ $# -ge 1 ] && [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
@@ -3102,15 +3003,20 @@ cp $table $tmp_table
 
 local list_files=()
 local i=0
+
 for bdg in ${bedgraphs[@]};
 do
 	echo $bdg
 	echo ${names[$i]}
+	echo 'here'
 	bedtools intersect -a $peak_file -b $bdg -wa -wb -sorted -loj | awk  -v OFS="\t" '$6 != "-1" {print $0} $6=="-1" {print $1,$2,$3,$4,$1,$2,$3,0}' > $out_dir/${names[$i]}.inter
+	echo 'here2'
 	python $compute_coverage -i $out_dir/${names[$i]}.inter -m
+	echo 'here3'
 	awk  '{print (1000*$5)/($3-$2)}' $out_dir/${names[$i]}.inter.cov | sed "1i${names[$i]}" > $out_dir/${names[$i]}.inter.cov.normed
 	list_files+=("$out_dir/${names[$i]}.inter.cov.normed")
 	local i=$i+1
+	echo 'here4'
 done
 # local files=`join_by " " "${list_files[@]}"`
 #paste $tmp_table $files > $table
@@ -3216,8 +3122,8 @@ paste $tmp_table $files > $out_dir/table.bed
 
 
 cooking_meth(){
-
-while  [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
+echo "entered"
+while [ $# -ge 1 ] && [[ -n $1 ]] && [[ $1 != "\n" ]] ; do
 	case $1 in
 		-g)
 			local genome=$2
@@ -3268,7 +3174,28 @@ motifLength=$(expr $tmp545 - 2)
 echo $motifLength
 
 # search the pfm against all bound regions
-mkdir -p $outdir/pfm_search
+mkdir -p -m 774 $outdir/pfm_search
+
+
+re='^[+-]?[0-9]+([.][0-9]+)?$'
+if ! [[ $cutoff =~ $re ]] ; then
+	if [ -f $cutoff ]; then
+		local cutoff=$(awk '{print $3}' $cutoff2 )
+		local cutoff2=$cutoff
+	fi
+fi
+
+if [[ $peaksCov == *"_RiL_RiP.tsv"* ]]; then
+	local header=$(awk 'NR==1{print tolower($7)}' $peaksCov)
+	echo $header
+	if [[ $header == *"ampdap"* ]]; then
+		awk -v OFS="\t" 'NR!=1{print $1,$2,$3,$8,$7}' $peaksCov > $outdir/tmp_peaks.tsv
+	else
+		awk -v OFS="\t" 'NR!=1{print $1,$2,$3,$7,$8}' $peaksCov > $outdir/tmp_peaks.tsv
+	fi
+	local peaksCov=$outdir/tmp_peaks.tsv
+fi
+head $peaksCov
 bedtools getfasta -fi $genome -bed $peaksCov -fo $outdir/pfm_search/all_peaks.fasta
 python $scores_prog -m $matrix_pfm -f $outdir/pfm_search/all_peaks.fasta -o $outdir/pfm_search
 pfmResults=$outdir/pfm_search/all_peaks.fasta.scores
@@ -3329,7 +3256,7 @@ if [ -z $negset ]; then echo "number of negative sets non specified, using defau
 
 
 ## usage
-# bash conservation_scores_v3.sh -f /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/results/orthologs/conservation/tests/ChIP_DAP_DEG_peakscoord.bed -o /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/results/orthologs/conservation/LFY/ChIP_DAP_DEG -m /home/312.6-Flo_Re/312.6.1-Commun/data/LFY.pfm -e 1000 -n /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/results/neg_controls_DAP00001/all_nc_ATXG_positions.bed --explicit
+# cons_scores -f /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/results/orthologs/conservation/tests/ChIP_DAP_DEG_peakscoord.bed -o /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/results/orthologs/conservation/LFY/ChIP_DAP_DEG -m /home/312.6-Flo_Re/312.6.1-Commun/data/LFY.pfm -e 1000 -n /home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/results/neg_controls_DAP00001/all_nc_ATXG_positions.bed --explicit
 
 ## debug files for LFY
 # outdir=/home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/results/orthologs/conservation/tests
@@ -3341,7 +3268,7 @@ if [ -z $negset ]; then echo "number of negative sets non specified, using defau
 
 ## Necessary paths and files:
 local A_thaliana_FASTA=/home/312.6-Flo_Re/312.6.1-Commun/data/tair10.fas
-local scores_prog=/home/312.6-Flo_Re/312.6.1-Commun/scripts/TFgenomicsAnalysis/bin/scores.py
+# local scores_prog=/home/312.6-Flo_Re/312.6.1-Commun/scripts/TFgenomicsAnalysis/bin/scores.py
 local get_bestscore_prog=/home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/scripts/select_bestscore.py
 local genome_file=/home/312.6-Flo_Re/312.6.1-Commun/data/tair10.txt
 local plot_scores_prog=/home/312.6-Flo_Re/312.6.1-Commun/LFY/LFY_targets/scripts/plot_cons_scores_v2.r
