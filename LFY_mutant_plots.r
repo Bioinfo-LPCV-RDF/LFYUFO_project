@@ -20,28 +20,29 @@ head(table)
 
 table$LFYm<-rowMeans(table[,c('LFYm_a', 'LFYm_b')], na.rm=TRUE)
 table$LFYmUFO<-rowMeans(table[,c('LFYmUFO_cfa', 'LFYmUFO_cfb')], na.rm=TRUE)
+table$LFYamp<-rowMeans(table[,c('LFYamp1', 'LFYamp2', 'LFYamp3')], na.rm=TRUE)
+table$LFYUFO<-rowMeans(table[,c('LFYUFO_cfa', 'LFYUFO_cfb', 'LFYUFO_cfc')], na.rm=TRUE)
 
 table$CFCm<-(table$LFYmUFO/table$LFYm)
+table$CFC<-(table$LFYUFO/table$LFYamp)
 
 
-
-
-LFYmvsLFYmUFO_gradient=c("#4cccff", "#a5a4a5", "#c39788", "#d29079", "#f0835b", "#ff7c4c") # simplified
-
+LFYvsLFYUFO_gradient=c("#ff4c91", "#ff4c60","#ff6a4c", "#ff8a4c", "#ffab4c")
 
 
 
 
 Fontsize=10
-limitsplot=c(min(c(table$LFYmUFO,table$LFYm)),max(c(table$LFYmUFO,table$LFYm)))
+# limitsplot=c(min(c(table$LFYmUFO,table$LFYm)),max(c(table$LFYmUFO,table$LFYm)))
+limitsplot=c(2,20000)
 
 ## graph 1: LFYm vs LFYmUFO, colored by LFYmUFO/LFYm ratio
 p_LFYm_LFYmUFO<-ggplot(data=table,aes(x=LFYmUFO, y=LFYm))+
   scale_y_log10(limits=limitsplot)+
   scale_x_log10(limits=limitsplot)+
-  geom_point(alpha=0.3,aes(color=CFCm))+
+  geom_point(alpha=0.3,aes(color=CFC))+
   geom_abline(intercept = 0,linetype="dashed",size=0.1) +
-  scale_colour_gradientn(colours=LFYmvsLFYmUFO_gradient,name=expression(paste("CFC = ",frac(paste(LFY[K249R],"-UFO"),LFY[K249R]))))+
+  scale_colour_gradientn(colours=LFYvsLFYUFO_gradient,name=expression(paste("CFC = ",frac("LFY-UFO","LFY"))))+
   theme(text = element_text(size = 7))+
   xlab(expression(paste(LFY[K249R],"-UFO (",Log[10]," RPKM)")))+
   ylab(expression(paste(LFY[K249R]," (",Log[10]," RPKM)")))+
@@ -52,7 +53,7 @@ p_LFYm_LFYmUFO<-ggplot(data=table,aes(x=LFYmUFO, y=LFYm))+
         legend.text=element_text(size=Fontsize+3),
         legend.title=element_text(size=Fontsize+3),
         legend.box = "horizontal")
-
+p_LFYm_LFYmUFO
 
 ggsave(file="CFC_LFYm_LFYmUFO.svg",device="svg",plot=p_LFYm_LFYmUFO,units="px", width=2000, height=1500)
 ggsave(file="CFC_LFYm_LFYmUFO.png",device="png",plot=p_LFYm_LFYmUFO,units="px", width=2000, height=1500)
